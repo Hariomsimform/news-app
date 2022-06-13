@@ -1,0 +1,14 @@
+Postgres Sql Set Up commands
+PostgreSql Install command: sudo apt install postgresql postgresql-contrib
+PostgreSql Start Command: sudo systemctl start postgresql.service
+terminal command: sudo -u postgres psql
+Password Change Command: ALTER USER postgres PASSWORD 'root';
+Again Start Command: psql -U postgres -h localhost
+Create another User: CREATE USER arul WITH CREATEDB LOGIN ENCRYPTED PASSWORD 'admin';
+CREATE ROLE
+CREATE DATABASE arul;
+CREATE DATABASE
+
+to start celery beat- celery -A celery_proj beat -l info
+
+to start celery worker- celery -A celery_proj.celery worker -l info
