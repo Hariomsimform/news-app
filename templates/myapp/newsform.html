@@ -1,0 +1,40 @@
+{% extends 'myapp/base.html' %}
+
+{% block head%}
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+{% endblock head %}
+{%block body%}
+    
+    <div class="container my-3">
+        <h2>Add News You Reported</h2>
+        <form action="/add-news/" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+            <label for="title"  class="form-label">News Title</label>
+            <input type="text" value="{{news.article_title}}" class="form-control" name="title" id="title" aria-describedby="emailHelp"> 
+            </div>
+            <div class="mb-3">
+            <label for="desc" class="form-label">News Description</label>
+            <textarea type="text" class="form-control" name="desc" id="desc">{{news.article_description}}</textarea>
+            </div>
+            <div class="mb-3">
+            <label for="desc" class="form-label">News Image</label>
+            <input type="file" name="image" value="{{news.article_img}}" class='form-control my-2'>
+            </div>
+            <label for="desc" class="form-label">Request For Approval</label>
+            <input type="checkbox" id="draft" name="draft" value="True">
+            </div>
+            
+            <button type="submit" class="btn btn-dark">Save</button>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-b5kHyXgcpbZJO/tY9Ul7kGkf1S0CWuKcCD38l8YkeH8z8QjE0GmW1gYU5S9FOnJ0"
+        crossorigin="anonymous"></script>
+{% endblock body %}

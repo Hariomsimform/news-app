@@ -12,3 +12,5 @@ CREATE DATABASE
 to start celery beat- celery -A celery_proj beat -l info
 
 to start celery worker- celery -A celery_proj.celery worker -l info
+
+user=UserProfile.objects.filter(news_preference_1='health').values('user_id__email')

@@ -1,0 +1,67 @@
+{% extends 'myapp/base.html' %}
+
+{% block head%}
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+{% endblock head %}
+{%block body%}
+    
+{%if user_group == 'Reporter'%}
+    <div class="    ">
+        <li class="nav-item my-2">
+            <a class="btn btn-outline-dark" href="/logout/">View Draft News</a>
+        </li>
+        <li class="nav-item my-2">
+            <a class="btn btn-outline-dark" href="/add-news/">Add News For Publish</a>
+        </li>
+        <li class="nav-item my-2">
+            <a class="btn btn-outline-dark" href="/published-news/">Your Published News</a>
+        </li>
+
+        <li class="nav-item my-2">
+            <a class="btn btn-outline-dark" href="/commented-news/">News Need To Modify</a>
+        </li>
+
+        <li class="nav-item my-2">
+            <a class="btn btn-outline-dark" href="/profile-view/">Your Rejected News</a>
+        </li>
+    </div>  
+    {% endif %}
+
+    {%if user_group == 'Editor'%}
+    <div>
+        <div class="">
+            <li class="nav-item my-2">
+                <a class="btn btn-outline-dark" href="/pending-news-editor/">View Pending Articles</a>
+            </li>
+            <li class="nav-item my-2">
+                <a class="btn btn-outline-dark" href="/approved-news/">Your Approved Articles</a>
+            </li>
+            <li class="nav-item my-2">
+                <a class="btn btn-outline-dark" href="/rejected-articles/">Your Rejected Articles</a>
+            </li>
+        </div>
+    </div> 
+    {% endif %}
+
+    {%if user_group == 'Publisher'%}
+    <div>
+        <div class="">
+            <li class="nav-item my-2">
+                <a class="btn btn-outline-dark" href="/published-news-publisher/">View Published Article</a>
+            </li>
+            <li class="nav-item my-2">
+                <a class="btn btn-outline-dark" href="/pending-news-publisher/">View Unpublished Articles</a>
+            </li>
+        </div>
+    </div>
+    {% endif %}
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-b5kHyXgcpbZJO/tY9Ul7kGkf1S0CWuKcCD38l8YkeH8z8QjE0GmW1gYU5S9FOnJ0"
+        crossorigin="anonymous"></script>
+{% endblock body %}

@@ -1,11 +1,12 @@
+from hashlib import new
 import time
 import pyshorteners
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User, auth
 from django.contrib.auth import login, logout
-from django.contrib.auth.decorators import login_required
-from .models import Articles, UserProfile
+from django.contrib.auth.decorators import login_required, permission_required
+from .models import Articles, UserProfile, News, Comments
 from .tasks import send_mail_func
   
 def register(request):
@@ -47,6 +48,8 @@ def login(request):
         print(user)
         if user is not None:
             auth.login(request, user)
+            if user.groups.filter(name__in=['Reporter', 'Editor',  'Publisher']).exists():
+                return redirect('/admin-backend/')
             return redirect('/home/')
         else:
             return render(request=request,template_name="myapp/login.html",
@@ -62,11 +65,6 @@ def logout_reqest(request):
 @login_required(login_url='/login/')
 def home(request):
     articles = Articles.objects.order_by('-id')[:200]  
-    for article in articles:
-        try:
-            print('Author:', len(article.article_author),'Title:',len(article.article_title),'Article URL:', len(article.article_url), 'article img url:',len(article.article_img_url),'article descriptin:', len(article.article_description))    
-        except:
-            pass
     return render(request=request, template_name='myapp/home.html', context={'articles':articles})
 
 @login_required(login_url='/login/')        
@@ -83,114 +81,134 @@ def user_profile(request):
         user_profile.save()
     return render(request=request,template_name='myapp/user_profile.html')
 
+@login_required(login_url='/login/')
+def news_reporter(request):
+    group = request.user.groups.values_list('name',flat=True)
+    user_group=group[0]
+    print(user_group)
+    return render(request, template_name='myapp/reporter.html',context={'user_group':user_group})
+
+@login_required(login_url='/login/')
+def news_editor(request):
+    return render(request, template_name='myapp/editor.html')
+
+@login_required(login_url='/login/')
+def news_publisher(request):
+    return render(request, template_name='myapp/publisher.html')
+
+@login_required(login_url='/login/')
+@permission_required('myapp.add_news', raise_exception=True)
+def add_news(request):
+    if request.method=='POST':
+        image = request.FILES['image']
+        title = request.POST['title']
+        desc = request.POST['desc']
+        reporter_condition = request.POST.get('draft',False)
+        if reporter_condition:
+            news=News(article_img=image, article_author="NONE",article_title=title, article_description=desc, reporter_condition=reporter_condition, editor_condition='pending')
+        else:
+            news=News(article_img=image, article_author="NONE",article_title=title, article_description=desc, reporter_condition=reporter_condition)
+        news.save()
+
+        return redirect('/admin-backend/')
+
+    return render(request, template_name='myapp/newsform.html')   
+@permission_required('myapp.view_news', raise_exception=True)
+def improve_news(request, id):
+    if request.method=='POST':
+        return HttpResponse('Done')
+    news=News.objects.get(id=id)
+    return render(request, template_name='myapp/newsform.html', context={'news':news})         
+
+@login_required(login_url='/login/')
+@permission_required('myapp.view_news', raise_exception=True)
+def pending_from_editor(request):
+    articles = News.objects.filter(editor_condition='pending').all()
+    article_all_data=[]
+    for article in articles:
+        article_all_data.append([article, list(article.comments_set.all())])
+    group = request.user.groups.values_list('name',flat=True)
+    user_group=group[0]
+    return render(request, template_name='myapp/editor_article.html', context={'articles_all_data':article_all_data, 'user_group':user_group,'user':request.user})
+
+@login_required(login_url='/login/')
+@permission_required('myapp.view_news', raise_exception=True)
+def pending_from_publisher(request):
+    articles = News.objects.filter(publisher_condition='not published').all()
+    return render(request, template_name='myapp/publish_article.html', context={'articles':articles})
+
+@login_required(login_url='/login/')
+@permission_required('myapp.change_news','myapp.view_news', raise_exception=True)
+def approve_news(request, id):
+    news = News.objects.get(id=id)
+    news.editor_condition = 'approved'
+    news.publisher_condition = 'not published'
+    news.save()
+    return redirect('/pending-news-editor/')
+
+@permission_required('myapp.change_news', raise_exception=True)
+def reject_news(request,id):
+    news=News.objects.get(id=id)
+    news.editor_condition = 'rejected'
+    news.save()
+    return redirect('/pending-news-editor/')
+
+@login_required(login_url='/login/')
+@permission_required('myapp.change_news','myapp.view_news', raise_exception=True)
+def publish_news(request, id):
+    news = News.objects.get(id=id)
+    news.publisher_condition = 'published'
+    news.save()
+    return redirect('/pending-news-publisher/')  
+
+@login_required(login_url='/login/')
+@permission_required('myapp.add_news', raise_exception=True)
+def send_comment(request,id):
+    if request.method=='POST':
+        news=News.objects.get(id=id)
+        comment = request.POST['comment']
+        comment = Comments(comment=comment, commentor=request.user, news=news)
+        comment.save()
+        return redirect('/pending-news-editor/')
+
+
+@login_required(login_url='/login/')
+@permission_required('myapp.view_news', raise_exception=True)
+def reporter_publish_news(request):
+    article_all_data = News.objects.filter(publisher_condition='published')
+    return render(request, template_name='myapp/reporter_publish_news.html', context={'articles_all_data':article_all_data} )
+
+
+@login_required(login_url='/login/')
+@permission_required('myapp.delete_news', raise_exception=True)
+def delete(request):
+    news=News.objects.filter(id=6).delete()
+    return redirect('/admin-backend/')
+
+
+
 import requests
-import datetime
-import threading
+import time
 def task_mail(self):
-    before=datetime.datetime.now()
-    def task1():
-        global health_articles 
-        url =  f'https://newsapi.org/v2/top-headlines?language=en&category=health&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
-        health_response = requests.get(url)
-        health_data = health_response.json()
-        health_articles=  health_data['articles']
-    def task2():
-        global entertainment_articles
-        url =  f'https://newsapi.org/v2/top-headlines?language=en&category=entertainment&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
-        entertainment_response = requests.get(url)
-        entertainment_data = entertainment_response.json()
-        entertainment_articles =  entertainment_data['articles']
-    def task3():
-        global general_articles
-        url =  f'https://newsapi.org/v2/top-headlines?language=en&category=general&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
-        general_response = requests.get(url)
-        general_data = general_response.json()
-        general_articles =  general_data['articles']
-    def task4():
-        global business_articles
-        url =  f'https://newsapi.org/v2/top-headlines?language=en&category=business&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
-        business_response = requests.get(url)
-        business_data = business_response.json()
-        business_articles =  business_data['articles']
-    def task5():
-        global sports_articles
-        url =  f'https://newsapi.org/v2/top-headlines?language=en&category=sports&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
-        sports_response = requests.get(url)
-        sports_data = sports_response.json()
-        sports_articles =  sports_data['articles']
-    def task6():
-        global science_articles
-        url =  f'https://newsapi.org/v2/top-headlines?language=en&category=science&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
-        science_response = requests.get(url)
-        science_data = science_response.json()
-        science_articles =  science_data['articles']
-    def task7():
-        global technology_articles
-        url =  f'https://newsapi.org/v2/top-headlines?language=en&category=technology&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
-        technology_response = requests.get(url)
-        technology_data = technology_response.json()
-        technology_articles =  technology_data['articles']
-
-    t1 = threading.Thread(target=task1, name='t1')
-    t2 = threading.Thread(target=task2, name='t2')  
-    t3 = threading.Thread(target=task3, name='t3')
-    t4 = threading.Thread(target=task4, name='t4')
-    t5 = threading.Thread(target=task5, name='t5')
-    t6 = threading.Thread(target=task6, name='t6') 
-    t7 = threading.Thread(target=task7, name='t7')  
-    t1.start()
-    t2.start()
-    t3.start()
-    t4.start()
-    t5.start()
-    t6.start()
-    t7.start()
-    t1.join()
-    t2.join()
-    t3.join()
-    t4.join()
-    t5.join()
-    t6.join()
-    t7.join()
-    print(health_articles,
-                entertainment_articles,
-                general_articles,
-                business_articles,
-                sports_articles, 
-                science_articles, 
-                technology_articles)
-    for health_article, entertainment_article, general_article,\
-        business_article, sports_article, science_article, technology_article in (zip(
-                                    health_articles, entertainment_articles,
-                                    general_articles, business_articles,
-                                    sports_articles, science_articles, technology_articles)):
-
-        article_list=[health_article, entertainment_article, general_article,
-        business_article, sports_article, science_article, technology_article]
-        article_category=['Health', 'Entertainment', 'General',
-        'Business', 'Sports', 'Science', 'Technology']
-        for index, article in enumerate(article_list):
+    categories = ['Health', 'Entertainment','General', 'Business', 'Sports', 'Science','Technology']
+    news_dict = {}
+    for category in categories:
+        url =  f'https://newsapi.org/v2/top-headlines?language=en&category={category}&apiKey=a67b087124e741b5ab0a7dcdd5b18465'
+        print(url)
+        news_response = requests.get(url)
+        news_data = news_response.json()    
+        news_dict[category+'_articles']=news_data['articles']
+    for index, news in enumerate(news_dict):
+        for article in news_dict[news]:
             try:
                 art=Articles.objects.get(article_title=article['title'])
+                print(art.article_title)
+                print(categories[index])
             except:
                 art=None  
             if art==None:
-                article_img_url=article['urlToImage']
-                article_url=article['url']
-                article_title = article['title']
-                print(len(article_title))
-                # if article_url:
-                #     if len(article_url)>199:
-                #         shortener=pyshorteners.Shortener()
-                #         x = shortener.tinyurl.short(article_url)
-                #         article_url = x
-
-                # if article_img_url:
-                #     if len(article_img_url)>199:
-                #         shortener=pyshorteners.Shortener()
-                #         x = shortener.tinyurl.short(article_img_url)
-                #         article_img_url = x    
-
+                if article['description']==None:
+                    article['description']='None'
                 article_instance=Articles(
                     article_img_url=article['urlToImage'],
                     article_author=article['author'],
@@ -198,20 +216,18 @@ def task_mail(self):
                     article_description=article['description'][:249],
                     article_url=article['url'],
                     article_publish=article['publishedAt'],
-                    article_category=article_category[index]
+                    article_category=categories[index]
                 )
                 article_instance.save()
                 email=UserProfile.objects.filter(
-                    news_preference_1=article_category[index].lower()
+                    news_preference_1=categories[index].lower()
                     ).values_list('user_id__email',flat=True) 
                 email=list(email)    
                 send_mail_func.delay(email, 
-                                    health_article['author'],
-                                    health_article['title'],
-                                    health_article['url'],
-                                    article_category[index]
-                                    )
-            
-    return HttpResponse('Done')
+                                    article['author'],
+                                    article['title'],
+                                    article['url'],
+                                    categories[index]
+                                    )                    
+    return HttpResponse('Done') 
 
-dict={'title':"Mithali Raj a catalyst in the growth of Indian women's cricket, but " 'the writing was on the wall for her, - Times of India',}
